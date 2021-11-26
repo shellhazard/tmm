@@ -6,8 +6,8 @@ Tiny package that uses [10MinuteMail](https://10minutemail.com) to generate temp
 
 Try out the example program:
 ```
-go install github.com/shellhazard/tmm/cmd/watch
-watch
+go install github.com/shellhazard/tmm/cmd/mailwatch
+mailwatch
 ```
 
 Or get stuck in:
