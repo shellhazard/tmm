@@ -4,7 +4,7 @@ Tiny package that uses [10MinuteMail](https://10minutemail.com) to generate temp
 
 ## Install
 
-Try it out:
+Try out the example program:
 ```
 go install github.com/shellhazard/tmm/cmd/watch
 watch
