@@ -1,0 +1,264 @@
+package tmm
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"path/filepath"
+	"strconv"
+	"time"
+
+	"github.com/shellhazard/tmm/internal"
+)
+
+const (
+	DefaultTimeout = 10 * time.Second
+
+	baseURL = "https://10minutemail.com"
+
+	endpointAddress     = "session/address"
+	endpointExpired     = "session/expired"
+	endpointReset       = "session/reset"
+	endpointSecondsLeft = "session/secondsLeft"
+
+	endpointMessagesAfter = "messages/messagesAfter"
+)
+
+var (
+	ErrBuildingRequest = errors.New("failed to construct request object")
+	ErrRequestFailed   = errors.New("request to 10minutemail failed")
+	ErrReadBody        = errors.New("reading response body failed")
+	ErrUnmarshalFailed = errors.New("unmarshalling response body failed")
+	ErrMissingSession  = errors.New("missing session cookie in response")
+)
+
+// Message represents a single email message sent to a temporary mail.
+type Message struct {
+	ID string `json:"id"`
+
+	Forwarded         bool   `json:"forwarded"`
+	RepliedTo         bool   `json:"repliedTo"`
+	SentDate          string `json:"sentDate"`
+	SentDateFormatted string `json:"sentDateFormatted"`
+	Sender            string `json:"sender"`
+	From              string `json:"from"`
+	Subject           string `json:"subject"`
+	Plaintext         string `json:"bodyPlainText"`
+	HTML              string `json:"bodyHtmlContent"`
+	Prewview          string `json:"bodyPreview"`
+}
+
+// Session holds information required to maintain a 10MinuteMail session.
+type Session struct {
+	address string
+	token   string
+
+	// The last time the session was reset.
+	lastreset time.Time
+
+	// The number of the last message fetched,
+	// to ensure we aren't refetching the same data.
+	lastKnownMessageCount int64
+
+	baseurl string
+	c       *http.Client
+}
+
+// New creates a new 10MinuteMail session with a random address.
+func New() (*Session, error) {
+	s := &Session{
+		baseurl: baseURL,
+		c: &http.Client{
+			Timeout: DefaultTimeout,
+		},
+		// It's better to assume that we have less time than more time.
+		// Assume our mail will expire 10 minutes from initialisation,
+		// before the request is made.
+		lastreset: time.Now(),
+	}
+
+	// Call internal function to pas
+	return newSession(s)
+}
+
+// newSession abstracts the logic of the New function
+// to enable testing.
+func newSession(s *Session) (*Session, error) {
+	// Initialise session
+	res, err := s.c.Get(join(baseURL, endpointAddress))
+	if err != nil {
+		return s, fmt.Errorf("%w: %s", ErrRequestFailed, err)
+	}
+	defer res.Body.Close()
+
+	// Read body
+	b, err := io.ReadAll(res.Body)
+	if err != nil {
+		return s, fmt.Errorf("%w: %s", ErrReadBody, err)
+	}
+
+	// Store session cookie
+	for _, cookie := range res.Cookies() {
+		if cookie.Name == "JSESSIONID" {
+			s.token = cookie.Value
+		}
+	}
+	if s.token == "" {
+		return s, ErrMissingSession
+	}
+
+	// Store address
+	v := &internal.AddressResponse{}
+	err = json.Unmarshal(b, v)
+	if err != nil {
+		return s, fmt.Errorf("%w: %s", ErrUnmarshalFailed, err)
+	}
+	s.address = v.Address
+
+	return s, nil
+}
+
+// Address returns the email address attached to the current session.
+func (s *Session) Address() string {
+	return s.address
+}
+
+// Expired returns whether or not the session is due to have expired
+// and is in need of renewal.
+func (s *Session) Expired() bool {
+	return !time.Now().Before(s.lastreset.Add(10 * time.Minute))
+}
+
+// ExpiresAt returns a time.Time object representing the instant
+// in time that the session is due to expire.
+func (s *Session) ExpiresAt() time.Time {
+	return s.lastreset.Add(10 * time.Minute)
+}
+
+// Messages contacts the server and returns a list of all messages
+// received to the email address attached to this session.
+//
+// Note that if any new messages are found, the same counter will
+// be updated that is used when calling the session.Latest() method,
+// so you won't need to call it afterwards.
+func (s *Session) Messages() ([]Message, error) {
+	return s.messages(0)
+}
+
+// Latest contacts the server and returns a list of any messages
+// that haven't already been received by this session.
+func (s *Session) Latest() ([]Message, error) {
+	return s.messages(s.lastKnownMessageCount)
+}
+
+func (s *Session) messages(i int64) ([]Message, error) {
+	var m []Message
+
+	// Prepare request
+	u := join(s.baseurl, endpointMessagesAfter, strconv.FormatInt(i, 10))
+	req, err := http.NewRequest(http.MethodGet, u, nil)
+	if err != nil {
+		return m, fmt.Errorf("%w: %s", ErrBuildingRequest, err)
+	}
+
+	// Attach token
+	req.AddCookie(&http.Cookie{
+		Name:   "JSESSIONID",
+		Value:  s.token,
+		MaxAge: 300,
+	})
+
+	// Make request
+	res, err := s.c.Do(req)
+	if err != nil {
+		return m, fmt.Errorf("%w: %s", ErrRequestFailed, err)
+	}
+	defer res.Body.Close()
+
+	// Read body
+	b, err := io.ReadAll(res.Body)
+	if err != nil {
+		return m, fmt.Errorf("%w: %s", ErrReadBody, err)
+	}
+
+	// Unmarshal response
+	err = json.Unmarshal(b, &m)
+	if err != nil {
+		return m, fmt.Errorf("%w: %s", ErrUnmarshalFailed, err)
+	}
+
+	// Update last received counter
+	s.lastKnownMessageCount = i + int64(len(m))
+
+	return m, nil
+}
+
+// Renew attempts to extend the session by an additional 10 minutes.
+// Returns a bool indicating whether the server indicated that the
+// reset was successful or not and an error if issues were encountered
+// while making the request.
+func (s *Session) Renew() (bool, error) {
+	// If our reset was successful, assume that we have
+	// 10 minutes from when this routine began, to be safe.
+	resetAt := time.Now()
+
+	// Prepare request
+	u := join(s.baseurl, endpointReset)
+	req, err := http.NewRequest(http.MethodGet, u, nil)
+	if err != nil {
+		return false, fmt.Errorf("%w: %s", ErrBuildingRequest, err)
+	}
+
+	// Attach token
+	req.AddCookie(&http.Cookie{
+		Name:   "JSESSIONID",
+		Value:  s.token,
+		MaxAge: 300,
+	})
+
+	// Make request
+	res, err := s.c.Do(req)
+	if err != nil {
+		return false, fmt.Errorf("%w: %s", ErrRequestFailed, err)
+	}
+	defer res.Body.Close()
+
+	// Read body
+	b, err := io.ReadAll(res.Body)
+	if err != nil {
+		return false, fmt.Errorf("%w: %s", ErrReadBody, err)
+	}
+
+	// Unmarshal response
+	v := &internal.ResetResponse{}
+	err = json.Unmarshal(b, v)
+	if err != nil {
+		return false, fmt.Errorf("%w: %s", ErrUnmarshalFailed, err)
+	}
+
+	// As far as I know, this string indicates success
+	if v.Response != "reset" {
+		return false, nil
+	}
+
+	// Update reset time
+	s.lastreset = resetAt
+
+	return true, nil
+}
+
+// join concatinates URL components.
+func join(b string, n ...string) string {
+	u, err := url.Parse(b)
+	if err != nil {
+		// should never happen..
+		panic(err)
+	}
+	for _, str := range n {
+		u.Path = filepath.Join(u.Path, str)
+	}
+	return u.String()
+}
