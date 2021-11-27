@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/http/httputil"
 	"net/url"
 	"path/filepath"
 	"strconv"
@@ -354,9 +353,6 @@ func (s *Session) Forward(messageid, recipient string) (bool, error) {
 		Value:  s.token,
 		MaxAge: 300,
 	})
-
-	d, _ := httputil.DumpRequest(req, true)
-	fmt.Printf("%s\n", string(d))
 
 	// Make request
 	res, err := s.c.Do(req)
