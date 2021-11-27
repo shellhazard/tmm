@@ -8,7 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"path/filepath"
+	"path"
 	"strconv"
 	"time"
 
@@ -379,7 +379,7 @@ func join(b string, n ...string) string {
 		panic(err)
 	}
 	for _, str := range n {
-		u.Path = filepath.Join(u.Path, str)
+		u.Path = path.Join(u.Path, str)
 	}
 
 	return u.String()
