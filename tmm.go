@@ -85,7 +85,6 @@ func New() (*Session, error) {
 		lastreset: time.Now(),
 	}
 
-	// Call internal function to pas
 	return newSession(s)
 }
 
