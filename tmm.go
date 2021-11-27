@@ -88,6 +88,18 @@ func New() (*Session, error) {
 	return newSession(s)
 }
 
+// NewWithClient is identical to New but allows
+// for passing a custom *http.Client object.
+func NewWithClient(c *http.Client) (*Session, error) {
+	s := &Session{
+		baseurl:   baseURL,
+		c:         c,
+		lastreset: time.Now(),
+	}
+
+	return newSession(s)
+}
+
 // newSession abstracts the logic of the New function
 // to enable testing.
 func newSession(s *Session) (*Session, error) {
