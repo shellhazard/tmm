@@ -1,3 +1,18 @@
+// Package tmm provides a simple interface to the 10MinuteMail web service.
+//   // Create a new session
+//   s, err := tmm.New()
+//   if err != nil {
+// 	   log.Fatal(err)
+//   }
+//
+//   // Check the email address
+//   addr := s.Address()
+//
+//   // Retrieve all messages
+//   mail, err := s.Messages()
+//   for _, m := range mail {
+// 	   fmt.Println(mail.Plaintext)
+//   }
 package tmm
 
 import (
