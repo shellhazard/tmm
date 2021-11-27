@@ -1,6 +1,6 @@
 # tmm
 
-Tiny package that uses [10MinuteMail](https://10minutemail.com) to generate temporary email addresses. Zero dependancies.
+Tiny package that uses [10MinuteMail](https://10minutemail.com) to generate temporary email addresses. Zero dependancies. Supports receiving, forwarding and replying to messages.
 
 ## Install
 

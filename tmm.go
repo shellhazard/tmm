@@ -66,7 +66,7 @@ type Session struct {
 
 	// The number of the last message fetched,
 	// to ensure we aren't refetching the same data.
-	lastKnownMessageCount int64
+	lastcount int64
 
 	baseurl string
 	c       *http.Client
@@ -160,7 +160,7 @@ func (s *Session) Messages() ([]Message, error) {
 // Latest contacts the server and returns a list of any messages
 // that haven't already been received by this session.
 func (s *Session) Latest() ([]Message, error) {
-	return s.messages(s.lastKnownMessageCount)
+	return s.messages(s.lastcount)
 }
 
 func (s *Session) messages(i int64) ([]Message, error) {
@@ -204,7 +204,7 @@ func (s *Session) messages(i int64) ([]Message, error) {
 	}
 
 	// Update last received counter
-	s.lastKnownMessageCount = i + int64(len(m))
+	s.lastcount = i + int64(len(m))
 
 	return m, nil
 }
