@@ -6,10 +6,12 @@ Tiny package that uses [10MinuteMail](https://10minutemail.com) to generate temp
 
 ## Install
 
-Try out the example program:
+Try the example program and get a mail proxy running in seconds:
 ```
-go install github.com/shellhazard/tmm/cmd/mailwatch
-mailwatch
+$ go install github.com/shellhazard/tmm/cmd/mailwatch
+$ mailwatch -fwd=realmail@example.com
+Your address is: fuzxptvvkwpdbalcek@sdvft.com
+Waiting for new messages.
 ```
 
 Or get stuck in:
