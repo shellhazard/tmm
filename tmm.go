@@ -104,7 +104,7 @@ func New() (*Session, error) {
 }
 
 // NewWithClient is identical to New but allows
-// for passing a custom *http.Client object.
+// for passing a custom HTTP client object.
 func NewWithClient(c *http.Client) (*Session, error) {
 	s := &Session{
 		baseurl:   baseURL,
