@@ -17,9 +17,9 @@ const ExampleMessages = `[
 	    "sender": "example@example.com",
 	    "from": "[Ljavax.mail.internet.InternetAddress;@683d4237",
 	    "subject": "Testing",
-	    "bodyPlainText": "jdasijduiasjduas",
-	    "bodyHtmlContent": "<div>jdasijduiasjduas<br></div>",
-	    "bodyPreview": "jdasijduiasjduas",
+	    "bodyPlainText": "hello world",
+	    "bodyHtmlContent": "<div>hello world<br></div>",
+	    "bodyPreview": "hello world",
 	    "id": "-14532887521908171110"
 	}
 ]`
@@ -34,9 +34,9 @@ const ExampleMessage = `{
     "sender": "example@example.com",
     "from": "[Ljavax.mail.internet.InternetAddress;@683d4237",
     "subject": "Testing",
-    "bodyPlainText": "jdasijduiasjduas",
-    "bodyHtmlContent": "<div>jdasijduiasjduas<br></div>",
-    "bodyPreview": "jdasijduiasjduas",
+    "bodyPlainText": "hello world",
+    "bodyHtmlContent": "<div>hello world<br></div>",
+    "bodyPreview": "hello world",
     "id": "-14532887521908171110"
 }`
 
