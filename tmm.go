@@ -32,7 +32,7 @@ import (
 
 const (
 	DefaultTimeout = 10 * time.Second
-	DateLayout     = "2006-01-02T15:04:06.999Z0700"
+	DateLayout     = "2006-01-02T15:04:05.999999999Z0700"
 
 	baseURL = "https://10minutemail.com"
 
