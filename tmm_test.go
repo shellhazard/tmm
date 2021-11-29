@@ -1,9 +1,57 @@
 package tmm
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 )
+
+const ExampleMessages = `[
+	{
+	    "read": false,
+	    "expanded": false,
+	    "forwarded": false,
+	    "repliedTo": false,
+	    "sentDate": "2021-11-28T08:21:06.000+0000",
+	    "sentDateFormatted": "Nov 28, 2021, 8:21:06 AM",
+	    "sender": "example@example.com",
+	    "from": "[Ljavax.mail.internet.InternetAddress;@683d4237",
+	    "subject": "Testing",
+	    "bodyPlainText": "jdasijduiasjduas",
+	    "bodyHtmlContent": "<div>jdasijduiasjduas<br></div>",
+	    "bodyPreview": "jdasijduiasjduas",
+	    "id": "-14532887521908171110"
+	}
+]`
+
+const ExampleMessage = `{
+    "read": false,
+    "expanded": false,
+    "forwarded": false,
+    "repliedTo": false,
+    "sentDate": "2021-11-28T08:21:06.000+0000",
+    "sentDateFormatted": "Nov 28, 2021, 8:21:06 AM",
+    "sender": "example@example.com",
+    "from": "[Ljavax.mail.internet.InternetAddress;@683d4237",
+    "subject": "Testing",
+    "bodyPlainText": "jdasijduiasjduas",
+    "bodyHtmlContent": "<div>jdasijduiasjduas<br></div>",
+    "bodyPreview": "jdasijduiasjduas",
+    "id": "-14532887521908171110"
+}`
+
+func TestUnmarshalMessage(t *testing.T) {
+	var m Message
+
+	err := json.Unmarshal([]byte(ExampleMessage), &m)
+	if err != nil {
+		t.Errorf("failed to unmarshal message: %s", err)
+	}
+
+	if m.SentDate.IsZero() {
+		t.Error("time object is zero, shouldn't be")
+	}
+}
 
 func TestExpired(t *testing.T) {
 	s := Session{

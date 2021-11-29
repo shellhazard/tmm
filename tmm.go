@@ -32,6 +32,7 @@ import (
 
 const (
 	DefaultTimeout = 10 * time.Second
+	DateLayout     = "2006-01-02T15:04:06.999Z0700"
 
 	baseURL = "https://10minutemail.com"
 
@@ -57,18 +58,57 @@ var (
 
 // Message represents a single email message sent to a temporary mail.
 type Message struct {
+	// The unique ID of the message on 10MinuteMail.
+	// Not permanent.
 	ID string `json:"id"`
+	// The time the message was sent at.
+	SentDate time.Time `json:"sentDate"`
+	// The email address of the sender of the message.
+	Sender string `json:"sender"`
+	// The subject of the email.
+	Subject string `json:"subject"`
+	// The email body as received in plaintext, with HTML stripped.
+	Plaintext string `json:"plaintext"`
+	// The email body with HTML tags included.
+	HTML string `json:"html"`
+	// A short preview of the message body.
+	Preview string `json:"preview"`
+}
 
-	Forwarded         bool   `json:"forwarded"`
-	RepliedTo         bool   `json:"repliedTo"`
-	SentDate          string `json:"sentDate"`
-	SentDateFormatted string `json:"sentDateFormatted"`
-	Sender            string `json:"sender"`
-	From              string `json:"from"`
-	Subject           string `json:"subject"`
-	Plaintext         string `json:"bodyPlainText"`
-	HTML              string `json:"bodyHtmlContent"`
-	Prewview          string `json:"bodyPreview"`
+func (m *Message) UnmarshalJSON(data []byte) error {
+	// Hacky workaround for custom time format.
+	// See https://github.com/golang/go/issues/21990.
+	type aux struct {
+		ID        string `json:"id"`
+		SentDate  string `json:"sentDate"`
+		Sender    string `json:"sender"`
+		Subject   string `json:"subject"`
+		Plaintext string `json:"bodyPlainText"`
+		HTML      string `json:"bodyHtmlContent"`
+		Preview   string `json:"bodyPreview"`
+	}
+
+	v := &aux{}
+	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+
+	m.ID = v.ID
+	m.Sender = v.Sender
+	m.Subject = v.Subject
+	m.Plaintext = v.Plaintext
+	m.HTML = v.HTML
+	m.Preview = v.Preview
+
+	// Custom time handler
+	t, err := time.Parse(DateLayout, v.SentDate)
+	if err != nil {
+		return err
+	}
+
+	m.SentDate = t
+
+	return nil
 }
 
 // Session holds information required to maintain a 10MinuteMail session.
