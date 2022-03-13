@@ -2,7 +2,11 @@
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/shellhazard/tmm.svg)](https://pkg.go.dev/github.com/shellhazard/tmm)
 
-Tiny package that uses [10MinuteMail](https://10minutemail.com) to generate temporary email addresses. Zero dependancies. Supports receiving, forwarding and replying to messages.
+Tiny package that uses [10MinuteMail](https://10minutemail.com) to generate temporary email addresses. Supports receiving, forwarding and replying to messages. 
+
+## Dependancies
+
+This library depends on the [uTLS package](https://github.com/shellhazard/tmm), a fork of `crypto/tls` that supports custom TLS ClientHello specifications.
 
 ## Install
 
