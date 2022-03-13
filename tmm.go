@@ -21,18 +21,21 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"path"
 	"strconv"
 	"time"
 
+	tls "github.com/refraction-networking/utls"
 	"github.com/shellhazard/tmm/internal"
 )
 
 const (
-	DefaultTimeout = 10 * time.Second
-	DateLayout     = "2006-01-02T15:04:05.999999999Z0700"
+	DefaultTimeout   = 10 * time.Second
+	DateLayout       = "2006-01-02T15:04:05.999999999Z0700"
+	DefaultUserAgent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.99 Safari/537.36"
 
 	baseURL = "https://10minutemail.com"
 
@@ -55,6 +58,66 @@ var (
 	ErrMissingSession  = errors.New("missing session cookie in response")
 	ErrBlockedByServer = errors.New("server is blocking requests from this host; probably rate limited")
 )
+
+// TLS fingerprint for Cloudflare bypass
+var spec = &tls.ClientHelloSpec{
+	CipherSuites: []uint16{
+		49195,
+		49196,
+		52393,
+		49199,
+		49200,
+		52392,
+		158,
+		159,
+		49161,
+		49162,
+		49171,
+		49172,
+		51,
+		57,
+		156,
+		157,
+		47,
+		53,
+	},
+	Extensions: []tls.TLSExtension{
+		&tls.RenegotiationInfoExtension{
+			Renegotiation: 0,
+		},
+		&tls.SNIExtension{
+			ServerName: "",
+		},
+		&tls.UtlsExtendedMasterSecretExtension{},
+		&tls.GenericExtension{
+			Id:   35,
+			Data: nil,
+		},
+		&tls.SignatureAlgorithmsExtension{
+			SupportedSignatureAlgorithms: []tls.SignatureScheme{
+				1027,
+				1025,
+			},
+		},
+		&tls.ALPNExtension{
+			AlpnProtocols: []string{
+				"http/1.1",
+			},
+		},
+		&tls.SupportedPointsExtension{
+			SupportedPoints: []uint8{
+				0,
+			},
+		},
+		&tls.SupportedCurvesExtension{
+			Curves: []tls.CurveID{
+				23,
+			},
+		},
+	},
+	TLSVersMin: 769,
+	TLSVersMax: 771,
+}
 
 // Message represents a single email message sent to a temporary mail.
 type Message struct {
@@ -127,12 +190,43 @@ type Session struct {
 	c       *http.Client
 }
 
+// headers returns the default set of headers to be sent with every request.
+func (s *Session) headers() http.Header {
+	return http.Header{
+		"User-Agent": []string{DefaultUserAgent},
+	}
+}
+
 // New creates a new 10MinuteMail session with a random address.
 func New() (*Session, error) {
 	s := &Session{
 		baseurl: baseURL,
 		c: &http.Client{
 			Timeout: DefaultTimeout,
+			Transport: &http.Transport{
+				DialTLS: func(network, addr string) (net.Conn, error) {
+					conn, err := net.Dial(network, addr)
+					if err != nil {
+						return nil, err
+					}
+
+					host, _, err := net.SplitHostPort(addr)
+					if err != nil {
+						return nil, err
+					}
+
+					config := &tls.Config{ServerName: host}
+					uconn := tls.UClient(conn, config, tls.HelloCustom)
+					if err := uconn.ApplyPreset(spec); err != nil {
+						return nil, err
+					}
+					if err := uconn.Handshake(); err != nil {
+						return nil, err
+					}
+
+					return uconn, nil
+				},
+			},
 		},
 		// It's better to assume that we have less time than more time.
 		// Assume our mail will expire 10 minutes from initialisation,
@@ -158,8 +252,16 @@ func NewWithClient(c *http.Client) (*Session, error) {
 // newSession abstracts the logic of the New function
 // to enable testing.
 func newSession(s *Session) (*Session, error) {
+	u := join(baseURL, endpointAddress)
+	req, err := http.NewRequest(http.MethodGet, u, nil)
+	if err != nil {
+		return s, fmt.Errorf("%w: %s", ErrBuildingRequest, err)
+	}
+
+	req.Header = s.headers()
+
 	// Initialise session
-	res, err := s.c.Get(join(baseURL, endpointAddress))
+	res, err := s.c.Do(req)
 	if err != nil {
 		return s, fmt.Errorf("%w: %s", ErrRequestFailed, err)
 	}
@@ -239,6 +341,8 @@ func (s *Session) messages(i int64) ([]Message, error) {
 		return m, fmt.Errorf("%w: %s", ErrBuildingRequest, err)
 	}
 
+	req.Header = s.headers()
+
 	// Attach token
 	req.AddCookie(&http.Cookie{
 		Name:   "JSESSIONID",
@@ -291,6 +395,8 @@ func (s *Session) Renew() (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("%w: %s", ErrBuildingRequest, err)
 	}
+
+	req.Header = s.headers()
 
 	// Attach token
 	req.AddCookie(&http.Cookie{
@@ -358,6 +464,8 @@ func (s *Session) Reply(messageid, body string) (bool, error) {
 		return false, fmt.Errorf("%w: %s", ErrBuildingRequest, err)
 	}
 
+	req.Header = s.headers()
+
 	// Attach token
 	req.AddCookie(&http.Cookie{
 		Name:   "JSESSIONID",
@@ -409,6 +517,8 @@ func (s *Session) Forward(messageid, recipient string) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("%w: %s", ErrBuildingRequest, err)
 	}
+
+	req.Header = s.headers()
 
 	// Set headers
 	req.Header.Add("Content-Type", "application/json")
