@@ -4,7 +4,7 @@
 
 Tiny package that uses [10MinuteMail](https://10minutemail.com) to generate temporary email addresses. Supports receiving, forwarding and replying to messages. 
 
-## Dependancies
+## Dependencies
 
 This library depends on the [uTLS package](https://github.com/shellhazard/tmm), a fork of `crypto/tls` that supports custom TLS ClientHello specifications.
 
